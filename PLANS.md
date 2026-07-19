@@ -539,3 +539,9 @@ Lot accepté. Vérifier que le commit fonctionnel et le commit de spécification
 - Listener CustomNPCs `QuestTurnedInEvent` enregistré dynamiquement; aucune dépendance de compilation ni mixin.
 - `clientSideOnly=false`, dépendances JourneyMap `>=6.0` et CustomNPCs `>=1.20.1` déclarées facultatives et ordonnées.
 - `gradlew build` réussi; runServer atteint le chargement puis s’est arrêté sur EULA non accepté.
+
+## 25. Compatibilité JourneyMap bêta — 2026-07-19
+
+- Corrige la contrainte Forge JourneyMap de `[6.0,)`, qui excluait les préversions `1.20.1-6.0.0-beta.*`.
+- Nouvelle borne : `[1.20.1-6.0.0-beta.0,)`, acceptant la bêta actuelle, les releases 6.x et les versions futures.
+- Version `3.0.5-test`; `gradlew --refresh-dependencies build` réussi.
