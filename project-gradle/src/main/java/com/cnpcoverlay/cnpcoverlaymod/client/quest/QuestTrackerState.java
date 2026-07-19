@@ -87,12 +87,7 @@ public final class QuestTrackerState {
         }
 
         List<QuestSnapshot> snapshots = provider.isAvailable() ? provider.getActiveQuests(player) : List.of();
-        QuestHistoryState.get().observe(
-                player,
-                snapshots,
-                provider.getFinishedQuestStamps(player),
-                forceHistoryObservation
-        );
+        // L'historique est autoritaire côté serveur et arrive par paquet S2C.
         boolean trackingChanged = updateTrackingForNewQuests(snapshots);
         quests.clear();
         snapshotsById.clear();

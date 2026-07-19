@@ -531,3 +531,11 @@ Installer `project-gradle/build/libs/cnpcoverlay-3.0.2.jar` dans le profil de te
 ### Reprise agent sans état
 
 Lot accepté. Vérifier que le commit fonctionnel et le commit de spécification sont présents sur `origin/master`, puis utiliser `project-gradle/build/libs/cnpcoverlay-3.0.3-test.jar` comme artefact de référence.
+## 24. Autorité serveur de l’historique — 2026-07-19
+
+- Version `3.0.4-test` publiée avant migration (`c065bc5`).
+- Suivi actif/UI conservés côté client; historique des remises validées déplacé côté serveur.
+- `SavedData` global Overworld indexé par UUID, paquet S2C borné, commande MJ `/cnpcoverlay history <player>` permission 2.
+- Listener CustomNPCs `QuestTurnedInEvent` enregistré dynamiquement; aucune dépendance de compilation ni mixin.
+- `clientSideOnly=false`, dépendances JourneyMap `>=6.0` et CustomNPCs `>=1.20.1` déclarées facultatives et ordonnées.
+- `gradlew build` réussi; runServer atteint le chargement puis s’est arrêté sur EULA non accepté.

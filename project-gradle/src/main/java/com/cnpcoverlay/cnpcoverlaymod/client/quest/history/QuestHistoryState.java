@@ -58,6 +58,17 @@ public final class QuestHistoryState {
         return entries;
     }
 
+    /** Remplace le cache local par le snapshot signé implicitement par le serveur. */
+    public synchronized void replaceFromServer(List<com.cnpcoverlay.cnpcoverlaymod.common.quest.history.QuestHistoryEntry> serverEntries) {
+        List<QuestHistoryEntry> mapped = new ArrayList<>();
+        for (var e : serverEntries) {
+            mapped.add(new QuestHistoryEntry(e.occurrenceId(), e.questId(), e.category(), e.title(), e.displayLogText(), e.objectives(),
+                    e.completedAtEpochMillis(), e.sourceFinishedStamp(), e.sequence()));
+        }
+        mapped.sort(Comparator.comparingLong(QuestHistoryEntry::sequence).reversed());
+        entries = List.copyOf(mapped);
+    }
+
     public void observe(
             Player player,
             List<QuestSnapshot> snapshots,
