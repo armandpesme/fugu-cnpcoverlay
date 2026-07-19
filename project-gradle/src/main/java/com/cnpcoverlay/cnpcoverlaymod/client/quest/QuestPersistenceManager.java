@@ -35,6 +35,7 @@ import net.minecraft.world.level.storage.LevelResource;
  *   "serverKey": {
  *     "playerUuid": {
  *       "followedQuestIds": ["1", "2"],
+ *       "seenQuestIds": ["1", "2", "3"],
  *       "activeQuestId": "1"
  *     }
  *   }
@@ -89,6 +90,22 @@ public final class QuestPersistenceManager {
         return data == null ? null : data.activeQuestId;
     }
 
+    /** Charge les quêtes déjà rencontrées afin de ne pas réactiver un décochage manuel. */
+    public Set<String> loadSeenQuestIds(Player player) {
+        Objects.requireNonNull(player, "player");
+        PlayerData data = loadPlayerData(player);
+        return data == null || data.seenQuestIds == null
+                ? Collections.emptySet()
+                : Collections.unmodifiableSet(data.seenQuestIds);
+    }
+
+    /** Indique si la persistance contient une baseline de quêtes déjà rencontrées. */
+    public boolean hasSeenQuestIds(Player player) {
+        Objects.requireNonNull(player, "player");
+        PlayerData data = loadPlayerData(player);
+        return data != null && data.seenQuestIds != null;
+    }
+
     /**
      * Sauvegarde l'état courant des quêtes suivies et de la quête active.
      * Écriture atomique&nbsp;: fichier temporaire puis renommage.
@@ -97,15 +114,16 @@ public final class QuestPersistenceManager {
      * @param followedQuestIds  ensemble des IDs suivis.
      * @param activeQuestId     ID de la quête active, peut être {@code null}.
      */
-    public void save(Player player, Set<String> followedQuestIds, String activeQuestId) {
+    public void save(Player player, Set<String> followedQuestIds, Set<String> seenQuestIds, String activeQuestId) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(followedQuestIds, "followedQuestIds");
+        Objects.requireNonNull(seenQuestIds, "seenQuestIds");
 
         Path filePath = resolveFilePath();
         if (filePath == null) {
             return;
         }
-        saveToPath(filePath, resolveContextKey(), player.getUUID().toString(), followedQuestIds, activeQuestId);
+        saveToPath(filePath, resolveContextKey(), player.getUUID().toString(), followedQuestIds, seenQuestIds, activeQuestId);
     }
 
     // -----------------------------------------------------------------------
@@ -176,10 +194,15 @@ public final class QuestPersistenceManager {
     }
 
     void saveToPath(Path filePath, String serverKey, String playerKey, Set<String> followedQuestIds, String activeQuestId) {
+        saveToPath(filePath, serverKey, playerKey, followedQuestIds, Set.of(), activeQuestId);
+    }
+
+    void saveToPath(Path filePath, String serverKey, String playerKey, Set<String> followedQuestIds, Set<String> seenQuestIds, String activeQuestId) {
         Objects.requireNonNull(filePath, "filePath");
         Objects.requireNonNull(serverKey, "serverKey");
         Objects.requireNonNull(playerKey, "playerKey");
         Objects.requireNonNull(followedQuestIds, "followedQuestIds");
+        Objects.requireNonNull(seenQuestIds, "seenQuestIds");
 
         try {
             Files.createDirectories(filePath.getParent());
@@ -203,6 +226,7 @@ public final class QuestPersistenceManager {
             Map<String, PlayerData> serverMap = root.computeIfAbsent(serverKey, k -> new HashMap<>());
             PlayerData data = new PlayerData();
             data.followedQuestIds = new HashSet<>(followedQuestIds);
+            data.seenQuestIds = new HashSet<>(seenQuestIds);
             data.activeQuestId = activeQuestId;
             serverMap.put(playerKey, data);
 
@@ -231,6 +255,18 @@ public final class QuestPersistenceManager {
         return data == null ? null : data.activeQuestId;
     }
 
+    Set<String> loadSeenQuestIds(Path filePath, String serverKey, String playerKey) {
+        PlayerData data = loadPlayerData(filePath, serverKey, playerKey);
+        return data == null || data.seenQuestIds == null
+                ? Collections.emptySet()
+                : Collections.unmodifiableSet(data.seenQuestIds);
+    }
+
+    boolean hasSeenQuestIds(Path filePath, String serverKey, String playerKey) {
+        PlayerData data = loadPlayerData(filePath, serverKey, playerKey);
+        return data != null && data.seenQuestIds != null;
+    }
+
     private static void backupBrokenFile(Path filePath, Exception exception) {
         Path backup = filePath.resolveSibling(filePath.getFileName() + ".broken-" + System.currentTimeMillis());
         try {
@@ -248,6 +284,7 @@ public final class QuestPersistenceManager {
     @SuppressWarnings("FieldMayBeFinal")
     private static final class PlayerData {
         private Set<String> followedQuestIds = new HashSet<>();
+        private Set<String> seenQuestIds;
         private String activeQuestId;
     }
 }

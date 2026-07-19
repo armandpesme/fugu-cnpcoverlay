@@ -10,6 +10,7 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid = CnpcOverlayMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class QuestTrackerUpdater {
     private static int tick = 0;
+    private static Object finishedQuestIdentity;
 
     private QuestTrackerUpdater() {
     }
@@ -21,11 +22,20 @@ public final class QuestTrackerUpdater {
         }
 
         tick++;
-        if (tick % 20 != 0) {
+        var mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            finishedQuestIdentity = null;
             return;
         }
 
-        var mc = Minecraft.getInstance();
-        QuestTrackerState.get().refresh(mc.player);
+        QuestTrackerState state = QuestTrackerState.get();
+        Object currentIdentity = state.getFinishedQuestIdentity(mc.player);
+        boolean force = tick % 20 == 0;
+        if (!force && currentIdentity == finishedQuestIdentity) {
+            return;
+        }
+
+        finishedQuestIdentity = currentIdentity;
+        state.refresh(mc.player, force);
     }
 }

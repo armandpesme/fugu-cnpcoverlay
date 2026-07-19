@@ -1,22 +1,101 @@
 package com.cnpcoverlay.cnpcoverlaymod.client.integration.customnpcs;
 
+import com.cnpcoverlay.cnpcoverlaymod.client.integration.QuestProvider.FinishedQuestStamps;
 import net.minecraft.world.entity.player.Player;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Method;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class CustomNpcsQuestProviderTest {
+    @Test
+    void activeDiscoverySurvivesAMissingPlayerDataClass() throws Exception {
+        CustomNpcsQuestProvider.Access access = CustomNpcsQuestProvider.Access.discover(
+                LegacyController.class,
+                LegacyQuest.class
+        );
+
+        assertActiveContractAndUnavailableHistory(access);
+    }
+
+    @Test
+    void activeDiscoverySurvivesAPlayerDataClassWithoutHistoryContract() throws Exception {
+        CustomNpcsQuestProvider.Access access = CustomNpcsQuestProvider.Access.discover(
+                LegacyController.class,
+                LegacyQuest.class,
+                PlayerDataWithoutHistoryFixture.class
+        );
+
+        assertActiveContractAndUnavailableHistory(access);
+    }
+
+    @Test
+    void finishedQuestStampsSupportThePublicRuntimeMap() throws Exception {
+        CustomNpcsQuestProvider.Access access = finishedQuestAccess(PlayerDataFixture.class);
+        FinishedQuestStamps result = access.finishedQuestStamps(null);
+
+        assertEquals(Map.of("7", 91L), result.stamps());
+        assertSame(PlayerDataFixture.INSTANCE.questData.finishedQuests, result.identityToken());
+        assertSame(result.identityToken(), access.finishedQuestIdentity(null));
+    }
+
+    @Test
+    void finishedQuestStampsSupportProtectedMapAccessors() throws Exception {
+        CustomNpcsQuestProvider.Access access = finishedQuestAccess(PlayerDataProtectedFixture.class);
+        FinishedQuestStamps result = access.finishedQuestStamps(null);
+
+        assertEquals(Map.of("7", 91L), result.stamps());
+        assertSame(PlayerDataProtectedFixture.INSTANCE.questData.identityToken(), result.identityToken());
+        assertSame(result.identityToken(), access.finishedQuestIdentity(null));
+    }
+
+    @Test
+    void readableEmptyFinishedQuestMapIsAvailable() throws Exception {
+        CustomNpcsQuestProvider.Access access = finishedQuestAccess(PlayerDataEmptyFixture.class);
+
+        FinishedQuestStamps result = access.finishedQuestStamps(null);
+
+        assertTrue(result.available());
+        assertTrue(result.stamps().isEmpty());
+        assertSame(PlayerDataEmptyFixture.INSTANCE.questData.finishedQuests, result.identityToken());
+    }
+
+    @Test
+    void missingPlayerQuestDataIsUnavailable() throws Exception {
+        CustomNpcsQuestProvider.Access access = finishedQuestAccess(PlayerDataUnavailableFixture.class);
+
+        FinishedQuestStamps result = access.finishedQuestStamps(null);
+
+        assertFalse(result.available());
+        assertTrue(result.stamps().isEmpty());
+    }
+
+    @Test
+    void nullFinishedQuestMapWithoutAccessorsIsUnavailable() throws Exception {
+        CustomNpcsQuestProvider.Access access = finishedQuestAccess(PlayerDataNullMapFixture.class);
+
+        FinishedQuestStamps result = access.finishedQuestStamps(null);
+
+        assertFalse(result.available());
+        assertTrue(result.stamps().isEmpty());
+    }
+
     @Test
     void discoverySupportsTheLegacyRuntimeQuestContract() {
         assertDoesNotThrow(() -> {
@@ -62,9 +141,24 @@ final class CustomNpcsQuestProviderTest {
         Class<?> accessClass = Arrays.stream(CustomNpcsQuestProvider.class.getDeclaredClasses())
                 .filter(type -> type.getSimpleName().equals("Access"))
                 .findFirst().orElseThrow();
-        Method discover = accessClass.getDeclaredMethod("discover", Class.class, Class.class);
+        Method discover = accessClass.getDeclaredMethod("discover", Class.class, Class.class, Class.class);
         discover.setAccessible(true);
-        return discover.invoke(null, LegacyController.class, questClass);
+        return discover.invoke(null, LegacyController.class, questClass, PlayerDataFixture.class);
+    }
+
+    private static CustomNpcsQuestProvider.Access finishedQuestAccess(Class<?> playerDataClass) throws Exception {
+        return CustomNpcsQuestProvider.Access.discover(
+                LegacyController.class,
+                LegacyQuest.class,
+                playerDataClass
+        );
+    }
+
+    private static void assertActiveContractAndUnavailableHistory(CustomNpcsQuestProvider.Access access)
+            throws Exception {
+        assertEquals(List.of(), access.getActiveQuests().invoke(null, new Object[]{null}));
+        assertSame(FinishedQuestStamps.class, access.finishedQuestIdentity(null));
+        assertFalse(access.finishedQuestStamps(null).available());
     }
 
     @SuppressWarnings("unchecked")
@@ -104,6 +198,80 @@ final class CustomNpcsQuestProviderTest {
     public static final class LegacyQuestInterface {
         public Object[] getObjectives(Player player) {
             return new Object[0];
+        }
+    }
+
+    public static final class PlayerDataFixture {
+        public static final PlayerDataFixture INSTANCE = new PlayerDataFixture();
+        public final QuestDataPublic questData = new QuestDataPublic();
+
+        public static PlayerDataFixture get(Player player) {
+            return INSTANCE;
+        }
+    }
+
+    public static final class QuestDataPublic {
+        public final Map<Integer, Long> finishedQuests = new HashMap<>(Map.of(7, 91L));
+    }
+
+    public static final class PlayerDataEmptyFixture {
+        public static final PlayerDataEmptyFixture INSTANCE = new PlayerDataEmptyFixture();
+        public final QuestDataEmpty questData = new QuestDataEmpty();
+
+        public static PlayerDataEmptyFixture get(Player player) {
+            return INSTANCE;
+        }
+    }
+
+    public static final class QuestDataEmpty {
+        public final Map<Integer, Long> finishedQuests = new HashMap<>();
+    }
+
+    public static final class PlayerDataUnavailableFixture {
+        public final QuestDataPublic questData = null;
+
+        public static PlayerDataUnavailableFixture get(Player player) {
+            return new PlayerDataUnavailableFixture();
+        }
+    }
+
+    public static final class PlayerDataNullMapFixture {
+        public final QuestDataNullMap questData = new QuestDataNullMap();
+
+        public static PlayerDataNullMapFixture get(Player player) {
+            return new PlayerDataNullMapFixture();
+        }
+    }
+
+    public static final class QuestDataNullMap {
+        public final Map<Integer, Long> finishedQuests = null;
+    }
+
+    public static final class PlayerDataWithoutHistoryFixture {
+    }
+
+    public static final class PlayerDataProtectedFixture {
+        public static final PlayerDataProtectedFixture INSTANCE = new PlayerDataProtectedFixture();
+        public final QuestDataProtected questData = new QuestDataProtected();
+
+        public static PlayerDataProtectedFixture get(Player player) {
+            return INSTANCE;
+        }
+    }
+
+    public static final class QuestDataProtected {
+        protected final Map<Integer, Long> finishedQuests = new HashMap<>(Map.of(7, 91L));
+
+        public Set<Integer> getFinishedQuest() {
+            return finishedQuests.keySet();
+        }
+
+        public long getFinishedTime(int questId) {
+            return finishedQuests.getOrDefault(questId, 0L);
+        }
+
+        Object identityToken() {
+            return finishedQuests;
         }
     }
 }

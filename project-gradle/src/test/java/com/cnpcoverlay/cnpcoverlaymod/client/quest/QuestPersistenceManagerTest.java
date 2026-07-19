@@ -140,6 +140,25 @@ final class QuestPersistenceManagerTest {
     }
 
     @Test
+    void seenQuestIdsPreserveAQuestThePlayerUnfollowed() throws Exception {
+        Path file = tempDir.resolve("tracked_quests.json");
+
+        manager.saveToPath(file, "srv", "p", Set.of(), Set.of("new-quest"), null);
+
+        assertTrue(manager.hasSeenQuestIds(file, "srv", "p"));
+        assertEquals(Set.of("new-quest"), manager.loadSeenQuestIds(file, "srv", "p"));
+    }
+
+    @Test
+    void legacyPersistenceHasNoSeenQuestBaseline() throws Exception {
+        Path file = tempDir.resolve("tracked_quests.json");
+        Files.writeString(file, "{\"srv\":{\"p\":{\"followedQuestIds\":[\"legacy\"],\"activeQuestId\":\"legacy\"}}}");
+
+        assertTrue(manager.loadSeenQuestIds(file, "srv", "p").isEmpty());
+        assertTrue(!manager.hasSeenQuestIds(file, "srv", "p"));
+    }
+
+    @Test
     void loadReturnsImmutableSet() throws Exception {
         Path file = tempDir.resolve("tracked_quests.json");
         manager.saveToPath(file, "srv", "p", Set.of("1"), null);

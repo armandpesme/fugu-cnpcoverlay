@@ -437,3 +437,97 @@ Décider du traitement de `quest_arrow-64x.png`, puis effectuer la détection Gi
 | TCRCore (référence HUD) | `docs/mods/sources/TCRCore-master/` |
 | Tâches actionnables | `TASK.md` |
 | Dépôt GitHub | `https://github.com/armandpesme/fugu-cnpcoverlay_chatgpt-codex_2.0.0` |
+
+## 21. Suivi activé par défaut pour une nouvelle quête — 2026-07-19
+
+### Progression
+
+- Une quête qui apparaît après l'initialisation du contexte joueur est ajoutée automatiquement au suivi local.
+- Le joueur peut ensuite la décocher normalement ; ce choix est conservé après un rafraîchissement ou une reconnexion.
+- Les quêtes déjà actives lors de la première synchronisation ne sont pas cochées en masse : elles constituent la baseline initiale.
+
+### Surprises et discovery
+
+- La persistance ne pouvait auparavant pas distinguer une quête nouvelle d'une quête volontairement décochée. Comparer uniquement aux IDs suivis aurait donc recoché les choix manuels.
+- La migration des fichiers JSON existants est implicite : l'absence de `seenQuestIds` crée une baseline au premier rafraîchissement, sans modifier les choix de suivi déjà sauvegardés.
+
+### Decision log
+
+- `QuestTrackerState` mémorise les IDs vus par contexte et ne coche automatiquement que les IDs absents de cet ensemble.
+- `QuestPersistenceManager` sauvegarde `seenQuestIds` séparément de `followedQuestIds` afin que le décochage manuel reste prioritaire.
+
+### Outcome et retrospective
+
+- Test rouge vérifié : les nouveaux contrats de persistance et de détection n'existaient pas encore.
+- Tests ciblés réussis : `./gradlew.bat test --tests com.cnpcoverlay.cnpcoverlaymod.client.quest.QuestPersistenceManagerTest --tests com.cnpcoverlay.cnpcoverlaymod.client.quest.QuestTrackerStateTest`.
+- Build réussi : `./gradlew.bat build` depuis `project-gradle/`, avec le JAR `project-gradle/build/libs/cnpcoverlay-3.0.1.jar`.
+- Risque restant : la prise de quête doit être confirmée en jeu avec le profil FuguDreams ; aucune synchronisation serveur ou paquet n'est impliqué.
+
+### Reprise agent sans état
+
+Installer le JAR 3.0.1 dans le profil de test, accepter une quête après connexion, vérifier que sa case est cochée, la décocher, puis rouvrir l'overlay ou se reconnecter pour confirmer qu'elle reste décochée.
+
+## 22. Passage en version 3.0.2 — 2026-07-19
+
+### Progression
+
+- `project-gradle/gradle.properties` indique désormais `mod_version=3.0.2`.
+- Le clean build complet est réussi, tests inclus.
+
+### Decision log
+
+- Le correctif de suivi automatique des nouvelles quêtes est distribué sous le numéro `3.0.2`, sans changement d'identifiant de mod, de dépendances ou de mappings.
+
+### Outcome et retrospective
+
+- Commande : `./gradlew.bat clean build` depuis `project-gradle/`.
+- Résultat : `BUILD SUCCESSFUL` ; `META-INF/mods.toml` embarque `version="3.0.2"`.
+- JAR produit : `project-gradle/build/libs/cnpcoverlay-3.0.2.jar`.
+- Avertissements restants : dépréciations `ResourceLocation(String, String)` déjà présentes, sans échec de compilation.
+
+### Reprise agent sans état
+
+Installer `project-gradle/build/libs/cnpcoverlay-3.0.2.jar` dans le profil de test et valider en jeu la case cochée à la prise d'une nouvelle quête, puis la conservation d'un décochage manuel.
+
+## 23. Historique des quêtes terminées — 2026-07-19
+
+### Progression
+
+- La version cible est `3.0.3-test`; le changement de version a été publié séparément sur `origin/master` par le commit `84e127e`.
+- L'overlay possède deux onglets intégrés, `En cours` et `Historique`. L'historique affiche uniquement les nouveaux stamps `PlayerData.questData.finishedQuests`, donc les quêtes réellement remises à CustomNPCs.
+- Les quêtes en cours, abandonnées ou seulement à 100 % ne créent aucune occurrence. Un changement de stamp d'une quête répétable ajoute une nouvelle occurrence.
+- La baseline initiale n'importe aucune ancienne validation. Elle est persistée même vide et reste monotone face aux maps transitoirement vidées par CustomNPCs.
+- Le stockage dédié `cnpcoverlay/quest_history.json` est atomique, isolé par contexte et UUID, et alimenté par un worker client mono-thread avec coalescence. Le chargement de contexte est également asynchrone.
+- La vue est virtualisée à quatre occurrences visibles, conserve recherche/sélection/scroll par onglet et adapte le panneau virtuel `380 x 260` aux petites surfaces GUI.
+- Reste : validation visuelle et fonctionnelle dans le profil modpack qui charge réellement CustomNPCs.
+
+### Surprises et discovery
+
+- `isQuestCompleted` indique seulement que les objectifs actifs sont achevés; le signal fiable de remise définitive est le changement de `finishedQuests`.
+- Le JAR CustomNPCs du modpack expose une map publique, tandis que des sources plus récentes utilisent un champ protégé et des accesseurs. L'intégration réfléchie couvre les deux contrats.
+- Les stamps mélangent temps de monde et temps réel selon le type de répétition; ils servent uniquement à la déduplication. L'ordre affiché repose sur une séquence locale croissante.
+- Une sauvegarde JSON synchrone depuis le tick client aurait pu produire des à-coups avec un historique volumineux. Les lectures/écritures ont été sorties du tick et les snapshots mémoire les plus récents restent autoritaires après un échec disque.
+- Le smoke `runClient` ne chargeait que `minecraft`, `forge` et `cnpcoverlay`; il ne pouvait donc pas valider visuellement la source CustomNPCs.
+- GitNexus fonctionne sans FTS/BM25. L'index de graphes est néanmoins à jour à 1 229 nœuds, 3 019 relations et 105 flux.
+
+### Decision log
+
+- Fonction entièrement client-side : aucun paquet, capability, tick ou stockage serveur CNPCoverlay; aucun Mixin ou Access Transformer.
+- Aucun historique antérieur n'est reconstruit, puisque le modpack est encore en développement sans données joueur à migrer.
+- L'identité de la map est comparée chaque tick client en O(1); le diff complet est limité aux changements d'identité et au contrôle de secours toutes les 20 ticks.
+- Les occurrences ne sont jamais tronquées arbitrairement. L'écran ne matérialise que la fenêtre visible et ne réalise ni I/O, réflexion, tri, filtre, découpage ni formatage de date dans `render()`.
+- Un hook JVM unique accorde au writer un budget total de deux secondes à l'arrêt, avec une seconde tentative unique si le premier flush échoue. Un arrêt brutal de processus reste, comme toute persistance locale, hors garantie.
+
+### Outcome et retrospective
+
+- Après la revue globale et le retry borné du dernier flush, `.\gradlew.bat build` a réussi depuis `project-gradle/` sous Java 17.0.19 / Gradle 8.8 : 114 tests, zéro échec et zéro erreur.
+- Le build d'acceptation a été relancé avec la même commande immédiatement avant publication : `BUILD SUCCESSFUL` en 10 s.
+- JAR produit et inspecté : `project-gradle/build/libs/cnpcoverlay-3.0.3-test.jar` (174 678 octets, SHA-256 `226BDFCFBD710C07568D4A5646605622B62322BEB2C7942E04F00E20056A5CF9`). Il contient les classes `client/quest/history/**`, le ViewModel et l'écran mis à jour, sans embarquer `journeymap/api/**`.
+- `.\gradlew.bat runClient --console=plain --no-daemon` a réussi en 54 s : client Forge, render thread, monde solo, connexion du joueur `Dev`, sauvegarde et arrêt propres; aucun `ERROR` ou `FATAL` dans `project-gradle/run/logs/latest.log`.
+- Les revues indépendantes des lots détecteur, stockage, intégration CustomNPCs, UI et I/O asynchrone ont approuvé les corrections après leurs cycles R2. La revue globale a ensuite imposé le découplage de la découverte active/historique, la confirmation des suppressions sur trois contrôles forcés et un arrêt borné du writer par hook JVM.
+- `node .gitnexus/run.cjs analyze` a actualisé l'index. `detect-changes --scope unstaged` classe le worktree combiné `CRITICAL` (215 symboles, 105 flux), car il agrège l'écran à impact HIGH, `QuestHistoryState` à impact CRITICAL, les nouveaux fichiers et les changements préexistants de suivi automatique; les impacts isolés du provider, du stockage et des helpers restent LOW à MEDIUM.
+- L'utilisateur a validé le JAR de test et autorisé la clôture du lot le 2026-07-19.
+
+### Reprise agent sans état
+
+Lot accepté. Vérifier que le commit fonctionnel et le commit de spécification sont présents sur `origin/master`, puis utiliser `project-gradle/build/libs/cnpcoverlay-3.0.3-test.jar` comme artefact de référence.

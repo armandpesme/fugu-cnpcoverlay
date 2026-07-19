@@ -4,6 +4,7 @@ import com.cnpcoverlay.cnpcoverlaymod.client.integration.QuestProvider;
 import com.cnpcoverlay.cnpcoverlaymod.client.HudDirectionalRenderer;
 import com.cnpcoverlay.cnpcoverlaymod.client.integration.customnpcs.CustomNpcsQuestProvider;
 import com.cnpcoverlay.cnpcoverlaymod.client.integration.journeymap.QuestMapMetadata;
+import com.cnpcoverlay.cnpcoverlaymod.client.quest.history.QuestHistoryState;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.ArrayList;
@@ -22,12 +23,14 @@ public final class QuestTrackerState {
     private final List<QuestEntry> quests = new ArrayList<>();
     private final Map<String, QuestSnapshot> snapshotsById = new HashMap<>();
     private final Set<String> followedQuestIds = ConcurrentHashMap.newKeySet();
+    private final Set<String> seenQuestIds = ConcurrentHashMap.newKeySet();
     private final QuestProvider provider = new CustomNpcsQuestProvider();
     private final QuestMarkerPlanner markerPlanner = new QuestMarkerPlanner();
     private List<QuestMarkerPlanner.DesiredMarker> desiredMarkers = List.of();
     private String activeQuestId;
     private String loadedContextKey;
     private Player lastKnownPlayer;
+    private boolean seenQuestIdsLoaded;
 
     private QuestTrackerState() {}
 
@@ -70,6 +73,10 @@ public final class QuestTrackerState {
 
     /** Appelé périodiquement côté client ; aucune réflexion ni I/O n'a lieu pendant le rendu HUD. */
     public void refresh(Player player) {
+        refresh(player, true);
+    }
+
+    public void refresh(Player player, boolean forceHistoryObservation) {
         if (player == null) {
             return;
         }
@@ -80,6 +87,13 @@ public final class QuestTrackerState {
         }
 
         List<QuestSnapshot> snapshots = provider.isAvailable() ? provider.getActiveQuests(player) : List.of();
+        QuestHistoryState.get().observe(
+                player,
+                snapshots,
+                provider.getFinishedQuestStamps(player),
+                forceHistoryObservation
+        );
+        boolean trackingChanged = updateTrackingForNewQuests(snapshots);
         quests.clear();
         snapshotsById.clear();
         for (QuestSnapshot snapshot : snapshots) {
@@ -96,27 +110,40 @@ public final class QuestTrackerState {
             activeQuestId = getFollowedQuests().stream().findFirst().map(QuestEntry::id).orElse(null);
         }
         rebuildMarkers();
+        if (trackingChanged) {
+            persistIfPlayerKnown();
+        }
     }
 
     public void clearForDisconnect() {
         quests.clear();
         snapshotsById.clear();
         followedQuestIds.clear();
+        seenQuestIds.clear();
         desiredMarkers = List.of();
         activeQuestId = null;
         loadedContextKey = null;
         lastKnownPlayer = null;
+        seenQuestIdsLoaded = false;
+        QuestHistoryState.get().clearForDisconnect();
         QuestMarkerPublisher.clear();
         HudDirectionalRenderer.clearSessionState();
     }
 
+    public Object getFinishedQuestIdentity(Player player) {
+        return provider.getFinishedQuestIdentity(player);
+    }
+
     private void resetForContext(String contextKey, Player player) {
         followedQuestIds.clear();
+        seenQuestIds.clear();
         activeQuestId = null;
         desiredMarkers = List.of();
         QuestMarkerPublisher.clear();
         Set<String> savedIds = QuestPersistenceManager.get().loadFollowedQuestIds(player);
         followedQuestIds.addAll(savedIds); // même un ensemble vide remplace intégralement la mémoire
+        seenQuestIds.addAll(QuestPersistenceManager.get().loadSeenQuestIds(player));
+        seenQuestIdsLoaded = QuestPersistenceManager.get().hasSeenQuestIds(player);
         activeQuestId = QuestPersistenceManager.get().loadActiveQuestId(player);
         loadedContextKey = contextKey;
     }
@@ -139,7 +166,33 @@ public final class QuestTrackerState {
 
     private void persistIfPlayerKnown() {
         if (lastKnownPlayer != null && loadedContextKey != null) {
-            QuestPersistenceManager.get().save(lastKnownPlayer, Set.copyOf(followedQuestIds), activeQuestId);
+            QuestPersistenceManager.get().save(lastKnownPlayer, Set.copyOf(followedQuestIds), Set.copyOf(seenQuestIds), activeQuestId);
         }
+    }
+
+    private boolean updateTrackingForNewQuests(List<QuestSnapshot> snapshots) {
+        Set<String> currentQuestIds = snapshots.stream().map(QuestSnapshot::id).collect(java.util.stream.Collectors.toSet());
+        if (!seenQuestIdsLoaded) {
+            seenQuestIds.addAll(currentQuestIds);
+            seenQuestIdsLoaded = true;
+            return true;
+        }
+
+        Set<String> newQuestIds = newlySeenQuestIds(seenQuestIds, snapshots);
+        if (newQuestIds.isEmpty()) {
+            return false;
+        }
+        seenQuestIds.addAll(newQuestIds);
+        followedQuestIds.addAll(newQuestIds);
+        return true;
+    }
+
+    static Set<String> newlySeenQuestIds(Set<String> seenQuestIds, List<QuestSnapshot> snapshots) {
+        Objects.requireNonNull(seenQuestIds, "seenQuestIds");
+        Objects.requireNonNull(snapshots, "snapshots");
+        return snapshots.stream()
+                .map(QuestSnapshot::id)
+                .filter(id -> !seenQuestIds.contains(id))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 }
