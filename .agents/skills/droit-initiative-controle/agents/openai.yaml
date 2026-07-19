@@ -1,0 +1,4 @@
+interface:
+  display_name: "Droit d'initiative controle"
+  short_description: "Cadre les decisions autonomes et validations"
+  default_prompt: "Use $droit-initiative-controle to decide whether to continue autonomously or ask Armand for validation."

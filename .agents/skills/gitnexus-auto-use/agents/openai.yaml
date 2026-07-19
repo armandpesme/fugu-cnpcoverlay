@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitNexus Auto Use"
+  short_description: "Use GitNexus autonomously in this project"
+  default_prompt: "Use $gitnexus-auto-use to decide when and how to apply GitNexus tools in this project."

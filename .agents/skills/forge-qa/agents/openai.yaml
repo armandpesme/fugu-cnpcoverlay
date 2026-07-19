@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge QA"
+  short_description: "Produire verdict QA Forge final"
+  default_prompt: "Use $forge-qa to produce a GO, NO-GO, or PENDING verdict for a Forge change."

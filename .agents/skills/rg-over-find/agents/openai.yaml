@@ -1,0 +1,4 @@
+interface:
+  display_name: "RG over Find"
+  short_description: "Recherche ripgrep (rg) au lieu de find/grep dans le code et assets"
+  default_prompt: "Use $rg-over-find to replace find/grep with ripgrep (rg) for content searches in this Forge 1.20.1 workspace: Java sources, JSON assets, lang keys, registry IDs, mixin targets, tags, recipes, datagen providers, and runtime logs. Prefer fd for filename-only searches and Select-String/Get-ChildItem for PowerShell fallbacks."

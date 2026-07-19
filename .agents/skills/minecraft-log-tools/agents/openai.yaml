@@ -1,0 +1,4 @@
+interface:
+  display_name: "Minecraft Log Tools"
+  short_description: "Outils de diagnostic logs (rg, fd, lnav, tail, mclo.gs)"
+  default_prompt: "Use $minecraft-log-tools to search, filter, and analyze Minecraft/Forge crash reports, latest.log, debug.log, launcher_log.txt, and hs_err_pid files with rg, fd, lnav, tail, and mclo.gs."

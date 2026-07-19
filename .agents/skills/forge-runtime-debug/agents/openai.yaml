@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Runtime Debug"
+  short_description: "Diagnostiquer crashs et logs"
+  default_prompt: "Use $forge-runtime-debug to diagnose a Forge crash, log error, runClient failure, or runtime regression."

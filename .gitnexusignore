@@ -1,0 +1,4 @@
+# Restrict GitNexus scan to project-gradle/ only.
+# GitNexus parses this file with the `ignore` npm package (gitignore spec 2.22.1),
+# so negation patterns (!) work to re-include paths after a wildcard ignore.
+

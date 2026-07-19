@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Build Check"
+  short_description: "Choisir et rapporter Gradle"
+  default_prompt: "Use $forge-build-check to verify a Forge change with the right Gradle command."

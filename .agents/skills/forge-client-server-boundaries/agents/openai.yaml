@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Client Server Boundaries"
+  short_description: "Controler sides et synchro"
+  default_prompt: "Use $forge-client-server-boundaries to review client, server, common, packet, and capability boundaries."

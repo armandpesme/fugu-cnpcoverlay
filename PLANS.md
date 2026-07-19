@@ -1,0 +1,356 @@
+# PLANS.md — CNPCoverlay : état canonique
+
+> **Projet :** Fugu'Dreams_Online / FuguTeams  
+> **Mod :** CNPCoverlay  
+> **Cible :** Minecraft 1.20.1 — Forge 47.4.20+ — Java 17  
+> **Signature :** `FuguTeams`  
+> **Dernière mise à jour :** 2026-07-13
+
+---
+
+## 1. Décision principale
+
+CNPCoverlay exploite des métadonnées techniques stockées dans les descriptions des quêtes CustomNPCs Unofficial pour :
+
+- Afficher un HUD directionnel (losange/flèche + distance) dans le monde
+- Générer des marqueurs JourneyMap (carte + mini-map)
+- Persister les choix de suivi par contexte (serveur ou monde solo)
+
+Règles fondamentales : voir `README.md → ## Contrainte`.
+
+---
+
+## 2. Audit de l'état actuel (2026-07-12)
+
+### 2.1 Fichiers existants dans `project-gradle/src/main/java/`
+
+```text
+com/cnpcoverlay/cnpcoverlaymod/client/integration/journeymap/QuestMapMetadata.java
+com/cnpcoverlay/cnpcoverlaymod/client/integration/journeymap/CnpcOverlayJourneyMapPlugin.java
+com/cnpcoverlay/cnpcoverlaymod/client/integration/journeymap/JourneyMapMarkerManager.java
+com/cnpcoverlay/cnpcoverlaymod/client/quest/QuestPersistenceManager.java
+com/cnpcoverlay/cnpcoverlaymod/client/quest/QuestTrackerState.java
+```
+
+Le parser lit déjà `#!` et `#?`. La persistance stocke les IDs suivis en JSON local.
+
+### 2.2 Problèmes critiques identifiés
+
+| # | Problème | Impact | Priorité |
+|---|----------|--------|----------|
+| 1 | **Stubs JourneyMap** dans `journeymap/api/**` — signatures inventées, compilation contre une fausse API | Échec runtime avec les vraies classes | 🔴 Bloquant |
+| 2 | **Dépendance Gradle non configurée** — `build.gradle` ne déclare pas la vraie API JourneyMap | Build non reproductible | 🔴 Bloquant |
+| 3 | `removeAllMarkers()` ne supprime rien — log uniquement | Marqueurs fantômes après déconnexion | 🔴 Bloquant |
+| 4 | Suppression par boucle `1..20` — IDs devinés au lieu d'enregistrés | Suppression incomplète ou collision | 🔴 Bloquant |
+| 5 | Objectifs terminés non gérés individuellement — `List<String> objectives` + `float progress` insuffisants | Tous les marqueurs `#!` restent jusqu'à 100% | 🔴 Bloquant |
+| 6 | `persistenceLoaded` chargé une seule fois par session | Pas de reset au changement de serveur/monde | 🔴 Bloquant |
+| 7 | Sauvegarde vide non appliquée — ne vide la mémoire que si IDs ≠ vide | Ancien état conservé après reset | 🔴 Bloquant |
+| 8 | Clé solo `(singleplayer)` fusionne tous les mondes | Collision entre sauvegardes solo | 🟠 Majeur |
+| 9 | Rendu Java-only non vérifié — le symbole JourneyMap prédéfini peut dépendre d'une texture | Contrainte potentiellement violée | 🟠 Majeur |
+| 10 | Tooltips non implémentés | Spécification non couverte | 🟡 Mineur |
+
+---
+
+## 3. Architecture cible
+
+Les noms peuvent être adaptés, les responsabilités doivent rester séparées.
+
+| Composant | Responsabilité | Dépend de |
+|-----------|---------------|-----------|
+| `QuestDescriptionView` | Conserver texte brut, produire version filtrée (lignes `#` masquées) | Rien |
+| `QuestMapMetadataParser` | Parser `#!` et `#?`, supporter négatifs, entrées collées, validation | Rien |
+| `QuestObjectiveSnapshot` | Record : index, texte, progression, completed (1-based) | Rien |
+| `QuestSnapshot` | Record : id, category, title, rawLogText, objectives[], progress, completed | `QuestObjectiveSnapshot` |
+| `QuestTrackingStore` | Persistance JSON par contexte (serveur IP:port / monde solo), écriture atomique, migration | Rien |
+| `QuestMarkerPlanner` | Produire `desiredMarkers` depuis état + métadonnées — testable sans JourneyMap | `QuestSnapshot`, `QuestMapMetadata` |
+| `JourneyMapClientBridge` | Création/update/suppression via vraie API JourneyMap, registre local, diff | API JourneyMap réelle |
+| `JourneyMapJavaRenderer` | Dessiner symboles, chiffres, losanges, cercles, flèches — 100% Java, aucun PNG | `GuiGraphics`, API JourneyMap |
+| `HudDirectionalRenderer` | Losange visible / flèche hors champ + distance dans le HUD monde | `QuestMarkerPlanner`, caméra Minecraft |
+| `QuestMarkerCoordinator` | Écouter changements (suivi, progression, contexte), orchestrer planner+bridge | Tous les composants |
+
+### 3.1 Pipeline de données
+
+```text
+CustomNPCs Quest.logText (lecture seule)
+    │
+    ├── QuestDescriptionView → texte filtré (affichage CNPCoverlay)
+    │
+    └── QuestMapMetadataParser → QuestMapMetadata
+            │
+            └── QuestMarkerPlanner + QuestTrackingStore
+                    │
+                    ├── JourneyMapClientBridge → marqueurs map/mini-map
+                    └── HudDirectionalRenderer → losange/flèche HUD
+```
+
+---
+
+## 4. Protocole de métadonnées v1
+
+### 4.1 Formats
+
+```
+#!<index>-<x>,<z>,<y>,<rayon>     → objectif incomplet
+#?-<x>,<z>,<y>                     → quête à rendre
+```
+
+Ordre des coordonnées : **X, Z, Y** (conversion explicite vers X, Y, Z pour les API Minecraft).
+
+### 4.2 Coordonnées négatives
+
+```
+#!1--1269,2534,105,10   → x=-1269, z=2534, y=105, rayon=10
+#!2--1200,-4500,64,15   → x=-1200, z=-4500, y=64, rayon=15
+#?--1269,2534,105       → x=-1269, z=2534, y=105
+```
+
+### 4.3 Référence de parsing
+
+Voir `PLAN_CNPCoverlay_JourneyMap_HUD_v2.md` sections 6.5 à 6.12.
+
+---
+
+## 5. Clé de contexte (persistance)
+
+```
+multiplayer:<host>:<port>    → serveur multijoueur
+singleplayer:<levelId>       → monde solo (identifiant stable du dossier de sauvegarde)
+```
+
+Format JSON : voir `PLAN_CNPCoverlay_JourneyMap_HUD_v2.md` section 8.4.
+
+---
+
+## 6. IDs des éléments JourneyMap
+
+```
+cnpcoverlay:<contextHash>:<playerUuid>:<questId>:objective:<index>:marker
+cnpcoverlay:<contextHash>:<playerUuid>:<questId>:objective:<index>:radius
+cnpcoverlay:<contextHash>:<playerUuid>:<questId>:turnin:marker
+```
+
+Registre local : `Map<MarkerId, RenderedMarkerHandle> activeMarkers`.
+
+Mise à jour par diff : `desiredMarkers Δ activeMarkers → create / update / remove`.
+
+---
+
+## 7. Couleurs par défaut
+
+| Type | Couleur | Hex |
+|------|---------|-----|
+| Objectif incomplet | Violet | `#9B30FF` |
+| Quête à rendre | Orange | `#FF8C00` |
+| Quête disponible (futur) | Jaune | `#FFD700` |
+
+---
+
+## 8. Phases d'implémentation
+
+| Phase | Description | Statut |
+|-------|-------------|--------|
+| 0 | Sauvegarde Git, scan GitNexus | ✅ Fait |
+| 1 | Audit réel des API CustomNPCs + JourneyMap | ✅ Fait |
+| 2 | Corriger la persistance (contexte, reset, sauvegarde vide) | ✅ Fait — couverture complémentaire à renforcer |
+| 3 | Enrichir le modèle des objectifs (complétion individuelle) | 🔄 Correctif runtime construit — re-test utilisateur requis |
+| 4 | Stabiliser le parser (négatifs, regex, validation) | ✅ Fait |
+| 5 | Planner pur (testable sans Minecraft) | ✅ Fait |
+| 6 | Vraie intégration JourneyMap (supprimer stubs, build contre API réelle) | ✅ Fait |
+| 7 | Renderer HUD/JourneyMap (symboles, textures validées, losanges, cercles, transparence) | ✅ Implémenté — contrôle visuel runtime restant |
+| 8 | Tooltips carte complète | ✅ Implémenté — contrôle visuel runtime restant |
+| 9 | Runtime, performances, runClient | ❌ NO-GO utilisateur : lancement stable mais mirroring corrigé à revalider |
+| 10 | Finalisation (PLANS.md, version, clean build, JAR, commit) | 🔄 Version 3.0.0 construite ; publication Git laissée à l'utilisateur |
+
+---
+
+## 9. Points différés
+
+| Point | Raison |
+|-------|--------|
+| Marqueur jaune « quête disponible » | Pas de source fiable côté client identifiée |
+| Dimension dans les métadonnées | Format non défini |
+| Configuration utilisateur avancée (couleurs, opacité, taille) | Post-jalon, après validation du cœur |
+| Regroupement de marqueurs | À traiter si chevauchements avérés en jeu |
+
+---
+
+## 10. Prochaine action concrète
+
+1. Lancer `runClient` et inspecter le démarrage sans erreur de classloading.
+2. Vérifier visuellement les deux variantes : sans JourneyMap puis avec le JAR local JourneyMap.
+3. Terminer la QA, lancer `clean build`, inspecter le JAR et mettre à jour la finalisation.
+
+---
+
+## 12. Progression — jalon d'implémentation du 2026-07-12
+
+### Fait
+
+- Audit direct des sources locales CustomNPCs, JourneyMap v2 et TCRCore. GitNexus n'a pas fourni d'index exploitable (erreur LadybugDB/FTS) ; les décisions sont donc étayées par les sources locales.
+- Extraction de l'API JourneyMap v2 locale dans `docs/mods/jar/journeymap-api-forge-1.20.1-2.0.0.jar`, dépendance Gradle `compileOnly` et JourneyMap réel uniquement en `runtimeOnly fg.deobf`.
+- Modèles `QuestObjectiveSnapshot` / `QuestSnapshot`, parser validé et dédoublonné, planner pur testé, persistance par contexte et pont JourneyMap v2 sans référence API dans le cœur.
+- Rendu JourneyMap/HUD avec les textures validées du dossier `docs/decisions/` et HUD directionnel caméra avec flèche stable derrière la caméra, distance et hystérésis. Cette décision remplace le prototype Java-only précédent.
+
+### Surprises et discovery
+
+- L'ancienne dépendance `blank:journeymap-1.20.1-5.10.3-forge` était absente et toutes ses signatures API v1 étaient incompatibles avec le JAR local JourneyMap 6 beta / API 2.0.0.
+- CustomNPCs fournit l'état objectif par `IQuestObjective#isCompleted()` et le champ du PNJ de remise est `completer`, non `completerNpc`.
+
+### Decision log
+
+- Le cœur publie des `DesiredMarker` sans importer JourneyMap ; seul le plugin v2 installe le bridge. Cela préserve le lancement sans JourneyMap.
+- Les cercles JourneyMap sont des polygones de 16 sommets et les icônes sont créées en mémoire, afin de respecter la contrainte Java-only / sans PNG.
+
+### Outcome et retrospective
+
+- `project-gradle`: `./gradlew.bat test`, `./gradlew.bat clean build` puis `./gradlew.bat build` réussis le 2026-07-12 sous Java 17.0.19 / Gradle 8.8 (40 tests verts).
+- JAR produit : `project-gradle/build/libs/cnpcoverlay-2.2.0.jar`; inspection : aucune entrée `journeymap/api/**` ni image PNG/JPG/JPEG/GIF/WebP.
+- `runClient` sans JourneyMap a atteint le thread de rendu, l'audio et les atlases sans erreur CNPCoverlay ; le processus de smoke test a été arrêté ensuite.
+- Avec `-PwithJourneyMap`, le JAR local `journeymap-forge-1.20.1-6.0.0-beta.4.jar` échoue avant le chargement de CNPCoverlay : son Mixin cible `Minecraft.m_91156_(ClientLevel)` alors que ce run Forge officiel expose `setLevel(ClientLevel)`. Le même échec apparaît avec et sans remappage ForgeGradle : incompatibilité de l'artefact bêta/environnement, non du bridge CNPCoverlay.
+
+### Reprise agent sans état
+
+Le code compile et les tests sont verts. Pour le contrôle JourneyMap complet, fournir un JAR JourneyMap Forge 1.20.1 compatible avec les mappings officiels/Forge 47.4.20 (ou un environnement de run compatible avec cet artefact), puis lancer `./gradlew.bat runClient -PwithJourneyMap` et valider visuellement les marqueurs. La publication Git est laissée à l'utilisateur conformément à la configuration de ce fil.
+
+---
+
+## 14. Passage en version 3.0.0 — 2026-07-13
+
+### Progression
+
+- Version Forge incrémentée de `2.2.0` à `3.0.0` dans `project-gradle/gradle.properties`.
+- `./gradlew.bat build` réussi depuis `project-gradle/` le 2026-07-13 ; `mods.toml` embarque bien `version="3.0.0"`.
+- JAR final produit : `project-gradle/build/libs/cnpcoverlay-3.0.0.jar`.
+- `./gradlew.bat clean build` réussi depuis `project-gradle/` le 2026-07-13 ; l'ancien artefact 2.2.0 est supprimé du dossier `build/libs`.
+- Les finitions restantes sont conservées comme backlog post-3.0.0 dans `TASK.md` : réglages HUD, scénarios runtime complets, validation JourneyMap et durcissement des tests.
+
+### Decision log
+
+- `3.0.0` est traité comme un jalon majeur fonctionnel : le numéro est propagé par `mods.toml` via `${mod_version}` et par le nom du JAR Gradle.
+
+### Reprise agent sans état
+
+Depuis `project-gradle/`, vérifier `build/libs/cnpcoverlay-3.0.0.jar` et son `mods.toml`. Ne pas réintroduire les anciennes références `2.2.0` dans les métadonnées générées.
+
+---
+
+## 13. Régression mirroring CustomNPCs — 2026-07-13
+
+### Progression
+
+- Retour utilisateur : jeu stable, mais écran CNPCoverlay vide malgré plusieurs quêtes actives ; verdict NO-GO.
+- Cause reproduite dans le vrai log Modrinth FuguDreams et correctif implémenté dans `CustomNpcsQuestProvider`.
+- Trois tests ciblés couvrent le contrat legacy, l'absence de champ completer et le JAR CustomNPCs réellement distribué dans `docs/mods/jar/`.
+- Reste : installer le nouveau JAR CNPCoverlay et confirmer visuellement que les quêtes sont de nouveau listées.
+
+### Surprises et discovery
+
+- Le bytecode CustomNPCs réellement chargé (`1.20.1.20260711`) diverge des sources locales : il expose `Quest.completerNpc`, pas `Quest.completer`.
+- Ce JAR n'expose pas `Quest.getObjectives(Player)` ; le chemin fonctionnel historique est `Quest.questInterface.getObjectives(Player)`.
+- Le provider 2.2.0 rendait ces deux variantes obligatoires pendant une découverte atomique. Le premier `NoSuchFieldException: completer` posait `discoveryFailed=true` définitivement ; `QuestTrackerState` recevait ensuite `List.of()` et vidait l'interface chaque seconde.
+
+### Decision log
+
+- Source de vérité runtime : le JAR exact du modpack, vérifié avec `javap` et par test de découverte, avant les sources locales divergentes.
+- La découverte ne dépend plus d'une métadonnée de remise : `completerNpc`, puis `completer`, sinon valeur absente.
+- Les objectifs sont lus par `questInterface.getObjectives(Player)`, comme dans la version 2.1.0 fonctionnelle. Une quête défaillante est isolée au lieu d'annuler toute la liste, et la découverte peut réessayer après cinq secondes.
+
+### Outcome et retrospective
+
+- Test rouge initial : `CustomNpcsQuestProviderTest` échouait sur l'absence de `Access.discover` et le contrat runtime non supporté.
+- Après correction : `./gradlew.bat test` puis `./gradlew.bat build` réussis depuis `project-gradle/` sous Java 17.0.19 / Gradle 8.8.
+- JAR produit : `project-gradle/build/libs/cnpcoverlay-2.2.0.jar`.
+- Risque restant : le mirroring doit être confirmé dans le profil FuguDreams connecté, car le run de développement local ne contient pas de données de quêtes serveur.
+
+### Reprise agent sans état
+
+Installer `project-gradle/build/libs/cnpcoverlay-2.2.0.jar` dans le profil de test, se connecter au serveur avec des quêtes actives et ouvrir CNPCoverlay. Le log attendu contient `Intégration CustomNPCs active (completerNpc)` et ne doit plus contenir `NoSuchFieldException: completer`. Si la liste reste vide, relever les nouvelles lignes `Quête CustomNPCs ignorée` ou `Lecture des quêtes CustomNPCs impossible`, désormais visibles au niveau WARN.
+
+---
+
+## 15. Régression HUD de remise de quête — 2026-07-13
+
+### Progression
+
+- Correctif appliqué au HUD de suivi : à 100 % avec un PNJ de remise configuré dans CustomNPCs, les objectifs sont remplacés par `Aller voir <nom du PNJ>`.
+- La liste normale des objectifs reste affichée tant que la progression est inférieure à 100 % ou qu'aucun PNJ de remise n'est configuré.
+
+### Surprises et discovery
+
+- Le provider récupérait encore `completerNpc` / `completer`, mais le refactoring de `QuestEntry` avait abandonné cet argument ; le HUD ne pouvait donc plus produire l'instruction de remise.
+- Le statut CustomNPCs `isQuestCompleted` n'est pas utilisé pour cette instruction : une quête active doit déjà orienter le joueur dès que ses objectifs atteignent 100 %.
+
+### Decision log
+
+- `QuestEntry.turnInInstruction()` porte la règle pure et testable ; `CnpcOverlayHud` l'emploie pour choisir entre la remise et les objectifs.
+
+### Outcome et retrospective
+
+- Test de régression ajouté dans `QuestEntryTest` : instruction visible à 100 %, absente à 99 %.
+- `./gradlew.bat test --tests com.cnpcoverlay.cnpcoverlaymod.client.quest.QuestEntryTest` puis `./gradlew.bat build` ont réussi depuis `project-gradle/` le 2026-07-13.
+- JAR produit : `project-gradle/build/libs/cnpcoverlay-3.0.0.jar`.
+- Smoke `./gradlew.bat runClient` : le client a atteint le thread de rendu et l'initialisation CNPCoverlay sans erreur, puis a été arrêté après le démarrage. Les données de quête serveur ne sont pas présentes dans cet environnement.
+
+### Reprise agent sans état
+
+Installer `project-gradle/build/libs/cnpcoverlay-3.0.0.jar` dans le profil de test, suivre une quête à 100 % avec un `completerNpc` défini et confirmer que le HUD affiche `Aller voir <PNJ>` à la place des objectifs validés.
+
+---
+
+## 16. Artefact de correctif 3.0.0-fix — 2026-07-13
+
+### Progression
+
+- La version de distribution est maintenant `3.0.0-fix` dans `project-gradle/gradle.properties`; `mods.toml` la reçoit via `${mod_version}`.
+
+### Surprises et discovery
+
+- Aucune dépendance, mapping ni configuration de run n'a été modifié ; le suffixe de version ne change que les métadonnées et le nom de l'artefact.
+
+### Decision log
+
+- Le suffixe `-fix` identifie explicitement le JAR contenant le correctif de remise de quête, sans changer l'identifiant de mod.
+
+### Outcome et retrospective
+
+- `./gradlew.bat build` a réussi depuis `project-gradle/` le 2026-07-13 sous Java 17.0.19 / Gradle 8.8.
+- JAR produit : `project-gradle/build/libs/cnpcoverlay-3.0.0-fix.jar`.
+
+### Reprise agent sans état
+
+Distribuer `project-gradle/build/libs/cnpcoverlay-3.0.0-fix.jar`, puis effectuer la validation serveur de la remise de quête documentée au jalon 15.
+
+## 17. Décision assets et parsing — 2026-07-13
+
+### Progression
+
+- Les assets validés dans `docs/decisions/` sont désormais empaquetés dans le mod sous `assets/cnpcoverlay/textures/markers/` : `quest_arrow.png`, `quest_icon.png` et `side_quest_1.png`.
+- Le HUD utilise `quest_arrow.png` pour toute flèche hors champ ; les cibles visibles utilisent `quest_icon.png` pour `#?` et `side_quest_1.png` pour `#!`.
+- JourneyMap utilise les mêmes textures via `MapImage(ResourceLocation, 16, 16)` ; le générateur `NativeImage` procédural a été retiré.
+- Le parser accepte `#?--1235,...` ainsi que la variante tolérée `#?1--1235,...`, sans modifier le format canonique `#?-1235,...`.
+
+### Vérification
+
+- `./gradlew.bat test` réussi le 2026-07-13.
+- `./gradlew.bat build` réussi le 2026-07-13 ; JAR : `project-gradle/build/libs/cnpcoverlay-3.0.0-fix.jar`.
+- `./gradlew.bat clean build` réussi le 2026-07-13 ; l'artefact ci-dessus provient d'une arborescence reconstruite intégralement.
+- `runClient` a atteint le thread de rendu et l'initialisation de CNPCoverlay sans crash ; le processus a été arrêté après le smoke test.
+- Le JAR contient bien les trois PNG sous `assets/cnpcoverlay/textures/markers/` et aucun stub `journeymap/api/**`.
+
+### Reprise agent sans état
+
+Installer le JAR dans le profil FuguDreams, ouvrir une quête contenant `#!1--...` et `#?--...`, puis confirmer visuellement les icônes et la flèche. Si un format réel diffère encore, conserver la ligne brute du journal et ajouter un cas de test au parser.
+
+---
+
+## 11. Références
+
+| Ressource | Chemin/URL |
+|-----------|------------|
+| Spécification complète | `PLAN_CNPCoverlay_JourneyMap_HUD_v2.md` |
+| Projet Gradle | `project-gradle/` |
+| Sources CustomNPCs | `docs/mods/sources/CustomNPCs-Unofficial-1.20.1/` |
+| API JourneyMap | `docs/mods/api/journeymap-api-1.20.1_2.0/` |
+| TCRCore (référence HUD) | `docs/mods/sources/TCRCore-master/` |
+| Tâches actionnables | `TASK.md` |
+| Dépôt GitHub | `https://github.com/armandpesme/fugu-cnpcoverlay_chatgpt-codex_2.0.0` |

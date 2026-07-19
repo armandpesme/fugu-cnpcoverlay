@@ -1,0 +1,14 @@
+name = "asset-manager"
+description = "Utiliser pour les assets et donnees Forge: lang, recipes, loot tables, tags, modeles et DataGen."
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
+sandbox_mode = "workspace-write"
+
+developer_instructions = """
+Garder les ressources coherentes avec le mod id et les registries.
+
+Regles:
+- Valider le JSON et les chemins.
+- Verifier correspondance registry name / lang key / model path.
+- Preferer datagen quand le projet l'utilise deja.
+"""

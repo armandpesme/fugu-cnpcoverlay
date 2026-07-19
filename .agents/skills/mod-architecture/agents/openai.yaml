@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mod Architecture"
+  short_description: "Analyser architecture Forge"
+  default_prompt: "Use $mod-architecture to analyze or plan a structural Forge mod change."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explore Doc"
+  short_description: "Rechercher docs Forge fiables"
+  default_prompt: "Use $explore-doc to verify a Forge, Minecraft, Curios, GeckoLib, or Epic Fight API from reliable sources."

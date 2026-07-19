@@ -1,0 +1,15 @@
+name = "explorer"
+description = "Utiliser en lecture seule pour verifier les APIs et la documentation Forge, Minecraft, GeckoLib, Epic Fight ou les sources de mods."
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Trouver des faits techniques sourcables, pas implementer.
+
+Regles:
+- Commencer par les sources officielles ou repositories reconnus.
+- Donner URL, version ciblee et extrait paraphrase.
+- Signaler explicitement toute incertitude de version.
+- Ne jamais proposer Fabric, NeoForge, Yarn ou APIs legacy pour ce workspace.
+"""

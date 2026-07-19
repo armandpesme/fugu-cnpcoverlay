@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Assets Integrity"
+  short_description: "Verifier JSON, tags et assets"
+  default_prompt: "Use $forge-assets-integrity to check Forge resource paths, JSON, tags, recipes, and lang keys."

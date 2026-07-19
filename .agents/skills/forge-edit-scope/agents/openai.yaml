@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Edit Scope"
+  short_description: "Cadrer les edits Forge cibles"
+  default_prompt: "Use $forge-edit-scope to prepare a scoped Forge code or resource edit."

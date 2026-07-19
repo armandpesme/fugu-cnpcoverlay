@@ -1,0 +1,4 @@
+interface:
+  display_name: "EXEE Plan"
+  short_description: "Tenir le plan de reprise agent"
+  default_prompt: "Use $exee-plan to update PLANS.md after a successful Gradle build or project milestone."

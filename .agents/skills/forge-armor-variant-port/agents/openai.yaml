@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Armor Variant Port"
+  short_description: "Porter des armures GeckoLib avec variantes"
+  default_prompt: "Use $forge-armor-variant-port to port visual-only Forge armor variants with correct IDs, assets, renderer routing, and optional Epic Fight compatibility."

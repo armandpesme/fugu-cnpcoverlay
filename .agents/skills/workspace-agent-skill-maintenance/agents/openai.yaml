@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workspace Agent Skill Maintenance"
+  short_description: "Maintenir la stack locale d’agents"
+  default_prompt: "Use $workspace-agent-skill-maintenance to add or correct local agents, repo skills, AGENTS.md, .codex/config.toml, and PLANS.md without recreating provider mirrors."

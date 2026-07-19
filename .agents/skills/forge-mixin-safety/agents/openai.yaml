@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Mixin Safety"
+  short_description: "Gerer mixins stricts et release"
+  default_prompt: "Use $forge-mixin-safety to handle strict Forge mixins, refmaps, accessors, or release guardrails."

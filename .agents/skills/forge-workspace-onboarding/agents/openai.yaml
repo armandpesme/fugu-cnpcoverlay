@@ -1,0 +1,4 @@
+interface:
+  display_name: "Forge Workspace Onboarding"
+  short_description: "Initialiser le contexte Forge local"
+  default_prompt: "Use $forge-workspace-onboarding to initialize the Forge workspace context before starting work."

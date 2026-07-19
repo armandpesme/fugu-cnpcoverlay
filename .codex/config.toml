@@ -1,0 +1,35 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+# Codex local workspace configuration for Minecraft Forge 1.20.1.
+# Official layout:
+# - project config: .codex/config.toml
+# - custom agents: .codex/agents/*.toml
+# - repository skills: .agents/skills/<skill>/SKILL.md
+
+sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+project_root_markers = ["AGENTS.md", "project-gradle", ".git"]
+project_doc_max_bytes = 24000
+web_search = "cached"
+
+[features]
+multi_agent = true
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[sandbox_workspace_write]
+network_access = true
+
+[shell_environment_policy]
+inherit = "core"
+ignore_default_excludes = false
+
+[mcp_servers.gitnexus]
+# Installation officielle ciblée sur le client d’agents configuré.
+# LadybugDB FTS depends on OpenSSL DLLs shipped with Git on Windows.
+command = "cmd.exe"
+args = ["/d", "/s", "/c", "set \"PATH=C:\\Program Files\\Git\\mingw64\\bin;%PATH%\"&& set \"GITNEXUS_LBUG_EXTENSION_INSTALL=load-only\"&& \"C:\\Users\\Armand\\AppData\\Roaming\\npm\\gitnexus.cmd\" mcp"]
+startup_timeout_sec = 30.0
+tool_timeout_sec = 120.0
+required = false

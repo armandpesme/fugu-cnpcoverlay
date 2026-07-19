@@ -1,0 +1,14 @@
+interface:
+  display_name: "Doubt QCM Pause"
+  short_description: "Met Codex en pause devant une décision humaine réellement nécessaire."
+  brand_color: "#F59E0B"
+  default_prompt: |
+    Utilise $doubt-qcm-pause.
+
+    Recherche d'abord la réponse. Si une décision humaine reste nécessaire,
+    appelle request_user_input avec une question, 2-3 options et la
+    recommandation en premier. Trace dans PLANS.md seulement les décisions
+    utiles à la reprise.
+
+policy:
+  allow_implicit_invocation: true
