@@ -549,3 +549,11 @@ Lot accepté. Vérifier que le commit fonctionnel et le commit de spécification
 - Decision log : borne `JourneyMap` fixée à `[1.20.1-6.0.0-beta.0,)` pour couvrir la bêta actuelle et les versions ultérieures.
 - Outcome et retrospective : depuis `project-gradle/`, `./gradlew.bat --refresh-dependencies build` réussi, JAR `project-gradle/build/libs/cnpcoverlay-3.0.5-test.jar` (193787 octets, SHA-256 `B0A3438DD7B2668E994956AE152A429935C62D601DAAC370CB9755E1E7D181C8`).
 - Reprise agent sans état : installer ce JAR côté client et serveur, puis valider que JourneyMap `1.20.1-6.0.0-beta.6` passe l’écran de connexion.
+
+## 26. Libellé de catégorie CustomNPCs — 2026-07-19
+
+- Progression : conversion et bootstrap corrigés ; JAR `3.0.7-test` prêt.
+- Surprises et discovery : `IQuest#getCategory()` retourne un objet `IQuestCategory`; sa conversion texte Java produisait `QuestCategory@…`.
+- Decision log : lire explicitement `IQuestCategory#getName()` par la passerelle de réflexion CustomNPCs, avec repli vide plutôt qu’un identifiant d’objet instable.
+- Outcome et retrospective : test de régression d’abord rouge (méthode d’extraction absente), puis vert ; `gradlew build` réussi. Smoke client final réussi (chargement puis arrêt normal, aucun `safe referent`), et démarrage dédié atteint le lancement Forge sans erreur de séparation avant l’arrêt EULA attendu.
+- Reprise agent sans état : installer `3.0.7-test` sur client et serveur puis vérifier en jeu une nouvelle remise de quête avec une catégorie nommée ; les entrées déjà enregistrées gardent leur ancien libellé.

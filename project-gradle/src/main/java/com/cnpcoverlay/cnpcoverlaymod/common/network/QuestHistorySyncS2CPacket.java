@@ -32,7 +32,7 @@ public record QuestHistorySyncS2CPacket(long sequence, List<QuestHistoryEntry> e
         return new QuestHistorySyncS2CPacket(seq,out);
     }
     public void handle(Supplier<NetworkEvent.Context> s) {
-        NetworkEvent.Context c=s.get(); c.enqueueWork(() -> net.minecraftforge.fml.DistExecutor.safeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
+        NetworkEvent.Context c=s.get(); c.enqueueWork(() -> net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,
                 () -> () -> com.cnpcoverlay.cnpcoverlaymod.client.quest.history.QuestHistoryState.get().replaceFromServer(entries)));
         c.setPacketHandled(true);
     }

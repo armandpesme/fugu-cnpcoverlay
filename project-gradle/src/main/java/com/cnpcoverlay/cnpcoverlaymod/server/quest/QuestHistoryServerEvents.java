@@ -38,9 +38,18 @@ public final class QuestHistoryServerEvents {
             if (!event.getClass().getName().equals("noppes.npcs.api.event.QuestEvent$QuestTurnedInEvent")) return;
             try { Object player=event.getClass().getField("player").get(event), quest=event.getClass().getField("quest").get(event); ServerPlayer p=(ServerPlayer)player.getClass().getMethod("getMCEntity").invoke(player); 
                 String id=String.valueOf(quest.getClass().getMethod("getId").invoke(quest)), title=String.valueOf(quest.getClass().getMethod("getName").invoke(quest));
-                String cat=String.valueOf(quest.getClass().getMethod("getCategory").invoke(quest)); String log=""; try {log=String.valueOf(quest.getClass().getMethod("getLogText").invoke(quest));}catch(ReflectiveOperationException ignored){}
+                String cat=categoryName(quest.getClass().getMethod("getCategory").invoke(quest)); String log=""; try {log=String.valueOf(quest.getClass().getMethod("getLogText").invoke(quest));}catch(ReflectiveOperationException ignored){}
                 QuestHistorySavedData d=QuestHistorySavedData.get(p.serverLevel()); QuestHistoryEntryShim.send(d,p,id,cat,title,log); }
             catch (ReflectiveOperationException | ClassCastException ignored) {}
+        }
+    }
+    static String categoryName(Object category) {
+        if (category == null) return "";
+        try {
+            Object name = category.getClass().getMethod("getName").invoke(category);
+            return name == null ? "" : name.toString();
+        } catch (ReflectiveOperationException ignored) {
+            return "";
         }
     }
     private static final class QuestHistoryEntryShim { static void send(QuestHistorySavedData d,ServerPlayer p,String id,String cat,String title,String log){var e=d.append(p.getUUID(),id,cat,title,log,List.of(),p.serverLevel().getGameTime()); CnpcNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(()->p),new QuestHistorySyncS2CPacket(e.sequence(),d.entries(p.getUUID())));}}
