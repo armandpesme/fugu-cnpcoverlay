@@ -544,4 +544,8 @@ Lot accepté. Vérifier que le commit fonctionnel et le commit de spécification
 
 - Corrige la contrainte Forge JourneyMap de `[6.0,)`, qui excluait les préversions `1.20.1-6.0.0-beta.*`.
 - Nouvelle borne : `[1.20.1-6.0.0-beta.0,)`, acceptant la bêta actuelle, les releases 6.x et les versions futures.
-- Version `3.0.5-test`; `gradlew --refresh-dependencies build` réussi.
+- Progression : correctif publié (`257f958`), JAR test prêt ; reste à le poser dans l’instance et confirmer l’écran de dépendances en jeu.
+- Surprises et discovery : Forge compare les préversions `beta.*` avant la release `6.0`; `[6.0,)` les excluait.
+- Decision log : borne `JourneyMap` fixée à `[1.20.1-6.0.0-beta.0,)` pour couvrir la bêta actuelle et les versions ultérieures.
+- Outcome et retrospective : depuis `project-gradle/`, `./gradlew.bat --refresh-dependencies build` réussi, JAR `project-gradle/build/libs/cnpcoverlay-3.0.5-test.jar` (193787 octets, SHA-256 `B0A3438DD7B2668E994956AE152A429935C62D601DAAC370CB9755E1E7D181C8`).
+- Reprise agent sans état : installer ce JAR côté client et serveur, puis valider que JourneyMap `1.20.1-6.0.0-beta.6` passe l’écran de connexion.
