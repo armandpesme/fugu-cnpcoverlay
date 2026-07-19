@@ -371,6 +371,61 @@ Installer `project-gradle/build/libs/cnpcoverlay-3.0.0-fix.jar` dans le profil F
 
 ---
 
+## 19. Icônes JourneyMap 64×64 — 2026-07-19
+
+### Progression
+
+- Les marqueurs d'objectif et de remise de quête utilisent maintenant `side_quest_1-64x.png` et `quest_icon-64x.png` exclusivement dans `JourneyMapMarkerManager`.
+- Leur taille de texture et d'affichage JourneyMap est fixée à 64×64 px ; le HUD 3D conserve les références PNG 16×16 existantes.
+- Un test unitaire verrouille les deux chemins de ressources JourneyMap et la constante de taille 64.
+
+### Surprises et discovery
+
+- L'API JourneyMap v2 est déclarée `compileOnly`, donc absente du classpath d'exécution JUnit par défaut. Elle est désormais ajoutée via `testRuntimeOnly` pour exécuter le test du pont sans l'embarquer dans le JAR du mod.
+- Les tests unitaires n'initialisent pas le bootstrap des registres Minecraft : le test couvre les constantes du pont, tandis que la validation visuelle reste à faire dans un client ayant JourneyMap.
+
+### Decision log
+
+- Les PNG haute définition sont consommés uniquement par `JourneyMapMarkerManager`; aucun changement n'est apporté à `HudDirectionalRenderer`. Cela limite l'effet aux vues JourneyMap (mini-carte et carte plein écran) et préserve le rendu monde/HUD.
+- `MapImage` reçoit 64×64, ce qui définit également sa taille d'affichage par défaut dans l'API JourneyMap v2.
+
+### Outcome et retrospective
+
+- Test ciblé réussi : `./gradlew.bat test --tests com.cnpcoverlay.cnpcoverlaymod.client.integration.journeymap.JourneyMapMarkerManagerTest` depuis `project-gradle/`.
+- Build réussi : `./gradlew.bat build` depuis `project-gradle/`; JAR produit : `project-gradle/build/libs/cnpcoverlay-3.0.1-alpha.jar`.
+- Inspection du JAR : les quatre icônes `quest_icon*.png` et `side_quest_1*.png`, dont les deux variantes `-64x`, sont présentes.
+- Risque restant : contrôle visuel requis avec un JAR JourneyMap compatible ; l'environnement de développement local reste bloqué par l'incompatibilité du JAR JourneyMap bêta documentée au jalon 12.
+
+### Reprise agent sans état
+
+Installer `project-gradle/build/libs/cnpcoverlay-3.0.1-alpha.jar` dans un profil avec JourneyMap compatible, puis ouvrir la mini-carte et la carte plein écran pour vérifier les deux marqueurs à 64×64 sans modification du HUD 3D.
+
+## 20. Préparation de distribution 3.0.1 — 2026-07-19
+
+### Progression
+
+- La version de distribution est passée de `3.0.1-alpha` à `3.0.1` dans `project-gradle/gradle.properties`.
+- `./gradlew.bat build` a réussi depuis `project-gradle/` ; il compile, exécute les tests et produit le JAR stable.
+- Le scan GitNexus incrémental a été rafraîchi après le build.
+
+### Surprises et discovery
+
+- GitNexus fonctionne sans son extension FTS : l'index de symboles reste à jour, mais la recherche plein texte/BM25 est indisponible.
+- Un fichier non suivi `quest_arrow-64x.png` mesure 16×16 et n'est pas référencé ; son inclusion dans le commit requiert une décision explicite.
+
+### Decision log
+
+- Le suffixe `-alpha` est retiré pour identifier le JAR de distribution comme `3.0.1` sans modifier l'identifiant du mod ni ses dépendances.
+
+### Outcome et retrospective
+
+- JAR vérifié : `project-gradle/build/libs/cnpcoverlay-3.0.1.jar` ; son `META-INF/mods.toml` contient `version="3.0.1"` et les icônes JourneyMap 64×64 attendues.
+- Risque restant : validation visuelle avec un JAR JourneyMap compatible, inchangée depuis le jalon 19.
+
+### Reprise agent sans état
+
+Décider du traitement de `quest_arrow-64x.png`, puis effectuer la détection GitNexus des changements et publier le commit de distribution 3.0.1 sur `master`.
+
 ## 11. Références
 
 | Ressource | Chemin/URL |

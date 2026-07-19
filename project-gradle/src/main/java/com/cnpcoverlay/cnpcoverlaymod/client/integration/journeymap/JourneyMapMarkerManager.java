@@ -25,8 +25,9 @@ import java.util.Map;
 /** Implémentation v2 de JourneyMap, isolée du cœur afin de préserver la dépendance optionnelle. */
 public final class JourneyMapMarkerManager {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final ResourceLocation QUEST_ICON = new ResourceLocation(CnpcOverlayMod.MODID, "textures/markers/quest_icon.png");
-    private static final ResourceLocation SIDE_QUEST_ICON = new ResourceLocation(CnpcOverlayMod.MODID, "textures/markers/side_quest_1.png");
+    private static final int JOURNEYMAP_ICON_SIZE = 64;
+    private static final ResourceLocation QUEST_ICON = new ResourceLocation(CnpcOverlayMod.MODID, "textures/markers/quest_icon-64x.png");
+    private static final ResourceLocation SIDE_QUEST_ICON = new ResourceLocation(CnpcOverlayMod.MODID, "textures/markers/side_quest_1-64x.png");
     private static final JourneyMapMarkerManager INSTANCE = new JourneyMapMarkerManager();
     private final Map<String, RenderedMarker> activeMarkers = new LinkedHashMap<>();
     private IClientAPI api;
@@ -97,7 +98,7 @@ public final class JourneyMapMarkerManager {
                 displayables.add(overlay);
             } else {
                 ResourceLocation icon = marker.type() == QuestMarkerPlanner.MarkerType.TURN_IN ? QUEST_ICON : SIDE_QUEST_ICON;
-                MapImage image = new MapImage(icon, 16, 16).centerAnchors().setBlur(false);
+                MapImage image = new MapImage(icon, JOURNEYMAP_ICON_SIZE, JOURNEYMAP_ICON_SIZE).centerAnchors().setBlur(false);
                 MarkerOverlay overlay = new MarkerOverlay(CnpcOverlayMod.MODID, new BlockPos(marker.x(), marker.y(), marker.z()), image);
                 overlay.setDimension(dimension);
                 overlay.setTitle(marker.tooltip());

@@ -23,7 +23,7 @@ TCRcore (fork des losange et fleche)(https://github.com/P1neapplell0/TCRCore.git
 
 | Ressource             | Valeur                                           |
 | --------------------- | ------------------------------------------------ |
-| notre Depot GitHub    | `https://github.com/armandpesme/fugu-cnpcoverlay_chatgpt-codex_2.0.0` |
+| notre Depot GitHub    | `https://github.com/armandpesme/fugu-cnpcoverlay` |
 | Schema GitNexus local | <http://localhost:4747/>                         |
 
 ## Contexte

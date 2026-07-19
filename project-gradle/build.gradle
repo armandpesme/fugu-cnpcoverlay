@@ -134,6 +134,7 @@ dependencies {
 
     // JourneyMap API v2 — fournie au runtime par JourneyMap, jamais embarquée.
     compileOnly files('../docs/mods/jar/journeymap-api-forge-1.20.1-2.0.0.jar')
+    testRuntimeOnly files('../docs/mods/jar/journeymap-api-forge-1.20.1-2.0.0.jar')
     // JourneyMap est optionnel : le run client standard vérifie aussi l'absence de classloading.
     // Activer `-PwithJourneyMap` pour injecter le JAR local dans l'environnement de développement.
     if (project.hasProperty('withJourneyMap')) {
