@@ -341,6 +341,34 @@ Distribuer `project-gradle/build/libs/cnpcoverlay-3.0.0-fix.jar`, puis effectuer
 
 Installer le JAR dans le profil FuguDreams, ouvrir une quête contenant `#!1--...` et `#?--...`, puis confirmer visuellement les icônes et la flèche. Si un format réel diffère encore, conserver la ligne brute du journal et ajouter un cas de test au parser.
 
+## 18. Correctif projection HUD selon l'altitude — 2026-07-19
+
+### Progression
+
+- Le HUD directionnel projette désormais chaque cible dans la base complète de la caméra (avant, droite, haut) : l'altitude et le pitch participent au test de visibilité comme au positionnement vertical de l'icône.
+- Un test de régression couvre les cibles au-dessus et au-dessous, ainsi que le regard vers le haut et le bas.
+- Reste : contrôle visuel dans le profil FuguDreams sur une quête dont la cible partage les coordonnées X/Z du joueur, mais pas son altitude.
+
+### Surprises et discovery
+
+- La source appliquait la composante Y de la cible, mais aplatissait auparavant le vecteur caméra sur le plan X/Z. Le pitch était donc ignoré lors de la projection HUD.
+- Le format de métadonnées `X, Z, Y` et sa conversion existante vers les API Minecraft ne sont pas concernés.
+
+### Decision log
+
+- Correction limitée à `HudDirectionalRenderer` et à son test unitaire : aucun état serveur, paquet, synchronisation, parser ou marker JourneyMap n'est modifié.
+- L'hystérésis de visibilité et le comportement de la flèche pour une cible derrière le joueur sont conservés.
+
+### Outcome et retrospective
+
+- `./gradlew.bat build` a réussi depuis `project-gradle/` le 2026-07-19 sous Java 17.0.19 / Gradle 8.8, tests inclus. JAR produit : `project-gradle/build/libs/cnpcoverlay-3.0.0-fix.jar`.
+- `./gradlew.bat runClient` a réussi : monde solo, handshake Forge et arrêt propre, sans erreur CNPCoverlay. Le contrôle n'incluait pas de données de quête réelles.
+- GitNexus : impact initial LOW (un consommateur direct ; aucun processus indexé). La détection finale isole le flux de rendu `Render → DrawIcon/DrawArrow`; les changements humains indépendants dans `AGENTS.md` et `README.md` restent hors périmètre.
+
+### Reprise agent sans état
+
+Installer `project-gradle/build/libs/cnpcoverlay-3.0.0-fix.jar` dans le profil FuguDreams et vérifier, sur une cible au même X/Z mais au-dessus puis au-dessous du joueur, que l'icône n'apparaît à l'écran que dans la direction correspondant au regard vertical. Relever une capture ou le log si le comportement diffère.
+
 ---
 
 ## 11. Références

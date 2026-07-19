@@ -30,11 +30,6 @@ public final class HudDirectionalRenderer {
         var camera = minecraft.gameRenderer.getMainCamera();
         Vec3 cameraPosition = camera.getPosition();
         Vec3 forward = Vec3.directionFromRotation(camera.getXRot(), camera.getYRot());
-        Vec3 horizontalForward = new Vec3(forward.x, 0.0, forward.z).normalize();
-        if (horizontalForward.lengthSqr() < 1.0e-6) {
-            horizontalForward = new Vec3(0.0, 0.0, 1.0);
-        }
-        Vec3 right = new Vec3(-horizontalForward.z, 0.0, horizontalForward.x);
         double fovRadians = Math.toRadians(minecraft.options.fov().get());
         double focalX = width / (2.0 * Math.tan(fovRadians / 2.0));
         double focalY = focalX;
@@ -44,20 +39,21 @@ public final class HudDirectionalRenderer {
             }
             Vec3 target = Vec3.atCenterOf(new BlockPos(marker.x(), marker.y(), marker.z()));
             Vec3 delta = target.subtract(cameraPosition);
-            double forwardDot = delta.dot(horizontalForward);
-            double rightDot = delta.dot(right);
-            double vertical = delta.y;
+            CameraProjection projection = project(delta, forward);
+            double forwardDot = projection.forward();
+            double rightDot = projection.right();
+            double upDot = projection.up();
             double horizontalAngle = Math.abs(Math.atan2(rightDot, forwardDot));
             boolean previouslyVisible = visibleState.getOrDefault(marker.id(), false);
             double threshold = fovRadians / 2.0 + (previouslyVisible ? Math.toRadians(2.0) : -Math.toRadians(2.0));
             boolean visible = forwardDot > 0.01 && horizontalAngle <= Math.max(0.0, threshold)
-                    && Math.abs(vertical / forwardDot) <= (height / 2.0) / focalY + 0.10;
+                    && Math.abs(upDot / forwardDot) <= (height / 2.0) / focalY + 0.10;
             visibleState.put(marker.id(), visible);
             int distance = Mth.floor(minecraft.player.position().distanceTo(target));
             String label = marker.type() == QuestMarkerPlanner.MarkerType.TURN_IN ? "?" : "!" + marker.objectiveIndex();
             if (visible) {
                 int x = Mth.floor(width / 2.0 + rightDot / forwardDot * focalX);
-                int y = Mth.floor(height / 2.0 - vertical / forwardDot * focalY);
+                int y = Mth.floor(height / 2.0 - upDot / forwardDot * focalY);
                 drawIcon(graphics, x, y, marker.type() == QuestMarkerPlanner.MarkerType.TURN_IN ? QUEST_ICON : SIDE_QUEST_ICON);
                 graphics.drawCenteredString(minecraft.font, label + " " + distance + " m", x, y + 10, 0xFFFFFFFF);
             } else {
@@ -75,6 +71,18 @@ public final class HudDirectionalRenderer {
             }
         }
     }
+
+    static CameraProjection project(Vec3 delta, Vec3 forward) {
+        Vec3 normalizedForward = forward.normalize();
+        Vec3 right = new Vec3(-normalizedForward.z, 0.0, normalizedForward.x).normalize();
+        if (right.lengthSqr() < 1.0e-6) {
+            right = new Vec3(-1.0, 0.0, 0.0);
+        }
+        Vec3 up = right.cross(normalizedForward).normalize();
+        return new CameraProjection(delta.dot(normalizedForward), delta.dot(right), delta.dot(up));
+    }
+
+    record CameraProjection(double forward, double right, double up) {}
 
     private static void drawIcon(GuiGraphics graphics, int x, int y, ResourceLocation texture) {
         graphics.blit(texture, x - 8, y - 8, 0, 0, 16, 16, 16, 16);
