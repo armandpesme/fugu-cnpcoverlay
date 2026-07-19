@@ -552,8 +552,16 @@ Lot accepté. Vérifier que le commit fonctionnel et le commit de spécification
 
 ## 26. Libellé de catégorie CustomNPCs — 2026-07-19
 
-- Progression : conversion et bootstrap corrigés ; JAR `3.0.7-test` prêt.
+- Progression : conversion et bootstrap corrigés ; JAR `3.0.7` prêt.
 - Surprises et discovery : `IQuest#getCategory()` retourne un objet `IQuestCategory`; sa conversion texte Java produisait `QuestCategory@…`.
 - Decision log : lire explicitement `IQuestCategory#getName()` par la passerelle de réflexion CustomNPCs, avec repli vide plutôt qu’un identifiant d’objet instable.
 - Outcome et retrospective : test de régression d’abord rouge (méthode d’extraction absente), puis vert ; `gradlew build` réussi. Smoke client final réussi (chargement puis arrêt normal, aucun `safe referent`), et démarrage dédié atteint le lancement Forge sans erreur de séparation avant l’arrêt EULA attendu.
-- Reprise agent sans état : installer `3.0.7-test` sur client et serveur puis vérifier en jeu une nouvelle remise de quête avec une catégorie nommée ; les entrées déjà enregistrées gardent leur ancien libellé.
+- Reprise agent sans état : installer `3.0.7` sur client et serveur puis vérifier en jeu une nouvelle remise de quête avec une catégorie nommée ; les entrées déjà enregistrées gardent leur ancien libellé.
+
+## 27. Validation release 3.0.7 — 2026-07-19
+
+- Progression : version `3.0.7` validée et JAR régénéré.
+- Commande : depuis `project-gradle/`, `./gradlew.bat clean build`.
+- Résultat : succès, 10 tâches exécutées, tests passés ; avertissements uniquement sur les constructeurs `ResourceLocation` dépréciés.
+- Artifact : `project-gradle/build/libs/cnpcoverlay-3.0.7.jar`, 192292 octets, SHA-256 `8FB398153F62672157A3C0639113BDA5809CFAFA7FEA6CA5C3B1AB97A71764DE`.
+- Prochaine action : scan GitNexus final, commit/push GitHub, puis installation client/serveur pour validation visuelle.
